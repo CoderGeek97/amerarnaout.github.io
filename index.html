@@ -114,7 +114,7 @@ img{display:block;max-width:100%}
   position:absolute;inset:0;z-index:0;
   width:100%;height:100%;display:block;
   pointer-events:none;opacity:0;
-  background:radial-gradient(ellipse 56% 60% at 66% 46%,rgba(14,13,10,.92) 0%,rgba(14,13,10,.5) 48%,rgba(14,13,10,0) 75%);
+  /* background gradient removed — transparent canvas now blends cleanly with page */
   transition:opacity 1.1s ease;
 }
 #hero3d.in{opacity:1}
@@ -866,11 +866,11 @@ if(ctm){
     if ("outputColorSpace" in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
     else if ("outputEncoding" in renderer && THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
     if (THREE.ACESFilmicToneMapping) renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.35;
     renderer.setClearColor(0x000000, 0);
 
     scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(INK, 7, 16);
+    // no fog — INK-coloured fog bled a dark halo through the transparent canvas
 
     camera = new THREE.PerspectiveCamera(CAM_FOV, 1, 0.1, 60);
     camera.position.set(CAM_POS.x, CAM_POS.y, CAM_POS.z);
@@ -883,7 +883,6 @@ if(ctm){
     lookHit = new THREE.Vector3();
 
     buildLights();
-    buildStars();
     buildMoon();
     buildAstronaut();
 
@@ -924,33 +923,24 @@ if(ctm){
   }
 
   function buildLights() {
-    var hemi = new THREE.HemisphereLight(0xcfd6c2, 0x0a0907, 0.55);
+    // Bright sky-blue top, warm sandy ground — makes white suit read cleanly
+    var hemi = new THREE.HemisphereLight(0xCCDDFF, 0xC0AC88, 0.80);
     scene.add(hemi);
 
-    var rim = new THREE.DirectionalLight(0xf4f1ea, 2.1);
-    rim.position.set(-4.5, 3.2, 3.5);
-    scene.add(rim);
+    // Strong key light from upper-left (sun)
+    var key = new THREE.DirectionalLight(0xFFF6E8, 4.5);
+    key.position.set(-5.5, 7.0, 4.5);
+    scene.add(key);
 
-    var fill = new THREE.DirectionalLight(0x4b5240, 0.35);
-    fill.position.set(2.5, -1, 4.5);
+    // Cool blue fill from right (sky bounce)
+    var fill = new THREE.DirectionalLight(0xAAC4FF, 0.80);
+    fill.position.set(4.5, 0.5, 5.0);
     scene.add(fill);
-  }
 
-  function buildStars() {
-    var count = isSmall ? 260 : 520;
-    var positions = new Float32Array(count * 3);
-    for (var i = 0; i < count; i++) {
-      var r = 9 + Math.random() * 9;
-      var theta = Math.random() * Math.PI * 2;
-      var phi = Math.acos(Math.random() * 1.4 - 0.7);
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta) + SUBJECT_OFFSET.x;
-      positions[i * 3 + 1] = r * Math.cos(phi) * 0.7 + 1.5;
-      positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta) - 4;
-    }
-    var geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    var mat = new THREE.PointsMaterial({ color: PAPER, size: 0.045, transparent: true, opacity: 0.55, depthWrite: false });
-    scene.add(new THREE.Points(geo, mat));
+    // Subtle warm rim from below (ground bounce off moon)
+    var rim = new THREE.DirectionalLight(0xF0E8D0, 0.45);
+    rim.position.set(0.5, -3.0, -2.0);
+    scene.add(rim);
   }
 
   // tiny deterministic hash noise — no external noise library needed
@@ -975,7 +965,7 @@ if(ctm){
       pos.array[i * 3 + 2] = iz + nz * bump;
     }
     geo.computeVertexNormals();
-    var mat = new THREE.MeshStandardMaterial({ color: 0x46443e, roughness: 1, metalness: 0 });
+    var mat = new THREE.MeshStandardMaterial({ color: 0xA8A49C, roughness: 0.96, metalness: 0 });
     moonMesh = new THREE.Mesh(geo, mat);
     moonMesh.position.set(SUBJECT_OFFSET.x, -3.85 + SUBJECT_OFFSET.y, -1.2);
     scene.add(moonMesh);
@@ -998,107 +988,182 @@ if(ctm){
   }
 
   function buildAstronaut() {
-    var suit = new THREE.MeshStandardMaterial({ color: 0x141310, roughness: 0.82, metalness: 0.06 });
-    var trim = new THREE.MeshStandardMaterial({ color: 0x232019, roughness: 0.6, metalness: 0.18 });
-    var visor = new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.08, metalness: 0.35 });
-    var glove = new THREE.MeshStandardMaterial({ color: 0x1b1916, roughness: 0.9, metalness: 0.02 });
+    // ── MATERIALS ─────────────────────────────────────────────────────────────
+    // White off-white suit (was near-black 0x141310)
+    var suit    = new THREE.MeshStandardMaterial({ color: 0xDEDAD1, roughness: 0.58, metalness: 0.07 });
+    var suitSh  = new THREE.MeshStandardMaterial({ color: 0xCBC7BE, roughness: 0.66, metalness: 0.05 });
+    // Vivid red accent bands — collar, visor rim, shoulder & wrist rings
+    var red     = new THREE.MeshStandardMaterial({ color: 0xCC1A1A, roughness: 0.38, metalness: 0.04 });
+    // Deep reflective visor glass (dark blue-black)
+    var visor   = new THREE.MeshStandardMaterial({ color: 0x07101E, roughness: 0.02, metalness: 0.96 });
+    // Light gray gloves
+    var gloveM  = new THREE.MeshStandardMaterial({ color: 0xC2BEB6, roughness: 0.74, metalness: 0.03 });
+    // Off-white boots
+    var bootM   = new THREE.MeshStandardMaterial({ color: 0xD5D1C8, roughness: 0.62, metalness: 0.04 });
+    // Teal boot toe accent (matches reference image exactly)
+    var tealM   = new THREE.MeshStandardMaterial({ color: 0x6EC8BC, roughness: 0.50, metalness: 0.08 });
+    // Dark chest control panel
+    var panelM  = new THREE.MeshStandardMaterial({ color: 0x18160F, roughness: 0.52, metalness: 0.22 });
+    // Backpack (slightly lighter than suit)
+    var packM   = new THREE.MeshStandardMaterial({ color: 0xD8D4CB, roughness: 0.56, metalness: 0.05 });
+    // Accent glow dot
+    var glowM   = new THREE.MeshStandardMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 1.8, roughness: 0.35 });
 
     astronautGroup = new THREE.Group();
     astronautGroup.position.set(SUBJECT_OFFSET.x, -1.55 + SUBJECT_OFFSET.y, -1.0);
     scene.add(astronautGroup);
 
-    // hips / seat base
-    var hips = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.55, 16), suit);
-    hips.position.y = 0;
+    // ── HIPS / SEAT ───────────────────────────────────────────────────────────
+    var hips = new THREE.Mesh(new THREE.CylinderGeometry(0.60, 0.68, 0.50, 16), suit);
     astronautGroup.add(hips);
 
-    // torso
-    var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.05, 16), suit);
-    torso.position.y = 0.78;
+    // ── TORSO — slightly shorter/wider for chibi proportions ──────────────────
+    var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.60, 0.92, 16), suit);
+    torso.position.y = 0.72;
     astronautGroup.add(torso);
 
-    // chest control panel (small trim detail)
-    var panel = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.06), trim);
-    panel.position.set(0, 0.85, 0.52);
-    astronautGroup.add(panel);
+    // ── CHEST CONTROL PANEL (dark box) ────────────────────────────────────────
+    var chestPanel = new THREE.Mesh(new THREE.BoxGeometry(0.37, 0.28, 0.06), panelM);
+    chestPanel.position.set(0, 0.78, 0.53);
+    astronautGroup.add(chestPanel);
 
-    // backpack (PLSS) + accent indicator light
-    var backpack = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.95, 0.34), trim);
-    backpack.position.set(0, 0.82, -0.55);
+    // Colourful indicator dots on panel (red / yellow / green / blue — matching reference)
+    [0xDD2222, 0xDDAA00, 0x33BB33, 0x3377CC].forEach(function (col, i) {
+      var dot = new THREE.Mesh(
+        new THREE.CircleGeometry(0.030, 8),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.9, roughness: 0.28 })
+      );
+      dot.position.set(-0.082 + i * 0.056, 0.78, 0.565);
+      astronautGroup.add(dot);
+    });
+
+    // ── THICK RED COLLAR — the most prominent reference detail ────────────────
+    var collar = new THREE.Mesh(new THREE.TorusGeometry(0.43, 0.075, 14, 34), red);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.set(0, 1.26, 0.02);
+    astronautGroup.add(collar);
+
+    // ── BACKPACK (PLSS) — large, rounded boxy ─────────────────────────────────
+    var backpack = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.08, 0.38), packM);
+    backpack.position.set(0, 0.78, -0.58);
     astronautGroup.add(backpack);
 
-    var lightMat = new THREE.MeshStandardMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 1.4, roughness: 0.4 });
-    backpackLight = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), lightMat);
-    backpackLight.position.set(0, 1.18, -0.38);
+    // Rounded dome on top of backpack (reference has a bulbous top)
+    var bpDome = new THREE.Mesh(new THREE.SphereGeometry(0.30, 14, 10), packM);
+    bpDome.scale.set(1.20, 0.55, 0.90);
+    bpDome.position.set(0, 1.36, -0.56);
+    astronautGroup.add(bpDome);
+
+    // Small side knob on backpack
+    var knob = new THREE.Mesh(new THREE.SphereGeometry(0.10, 10, 8), suitSh);
+    knob.position.set(0.38, 0.95, -0.58);
+    astronautGroup.add(knob);
+
+    // Accent glow indicator
+    backpackLight = new THREE.Mesh(new THREE.SphereGeometry(0.050, 10, 10), glowM);
+    backpackLight.position.set(0, 1.14, -0.41);
     astronautGroup.add(backpackLight);
 
-    // neck + helmet (the part that tracks the cursor)
+    // ── HELMET — OVERSIZED chibi sphere (key shape in reference image) ─────────
     helmetPivot = new THREE.Group();
-    helmetPivot.position.set(0, 1.42, 0.06);
+    helmetPivot.position.set(0, 1.48, 0.05);
     astronautGroup.add(helmetPivot);
 
-    var head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 20), suit);
+    // Big round white helmet
+    var head = new THREE.Mesh(new THREE.SphereGeometry(0.54, 30, 24), suit);
     helmetPivot.add(head);
 
-    var visorMesh = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.62), visor);
-    visorMesh.position.set(0, 0.02, 0.16);
-    visorMesh.rotation.x = -0.25;
+    // Dark visor — large oval window
+    var visorMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.46, 26, 20, 0, Math.PI * 2, 0, Math.PI * 0.60),
+      visor
+    );
+    visorMesh.position.set(0, 0.06, 0.20);
+    visorMesh.rotation.x = -0.30;
     helmetPivot.add(visorMesh);
 
-    var visorRim = new THREE.Mesh(new THREE.CylinderGeometry(0.39, 0.39, 0.06, 24), trim);
+    // RED visor rim — thick ring matching the bold red frame in reference
+    var visorRim = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.062, 14, 38), red);
     visorRim.rotation.x = Math.PI / 2;
-    visorRim.position.set(0, -0.03, 0.04);
+    visorRim.position.set(0, 0.02, 0.06);
     helmetPivot.add(visorRim);
 
-    // arms — resting on knees, bent at the elbow
+    // Small antenna stub on right side of helmet
+    var ant = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.20, 8), suitSh);
+    ant.rotation.z = 0.45;
+    ant.position.set(0.50, 0.26, -0.06);
+    helmetPivot.add(ant);
+    var antTip = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6), suitSh);
+    antTip.position.set(0.60, 0.38, -0.06);
+    helmetPivot.add(antTip);
+
+    // ── ARMS — chubby, resting on knees ──────────────────────────────────────
     [-1, 1].forEach(function (side) {
       var shoulder = new THREE.Group();
-      shoulder.position.set(0.62 * side, 1.12, 0.05);
+      shoulder.position.set(0.65 * side, 1.06, 0.03);
       astronautGroup.add(shoulder);
 
-      var upperArm = makeLimb(0.17, 0.62, suit);
+      // Red shoulder ring
+      var sBand = new THREE.Mesh(new THREE.TorusGeometry(0.192, 0.050, 10, 24), red);
+      sBand.rotation.z = side * 0.55;
+      sBand.position.set(side * 0.06, -0.02, 0.03);
+      shoulder.add(sBand);
+
+      var upperArm = makeLimb(0.185, 0.65, suit);
       upperArm.rotation.z = side * 0.55;
-      upperArm.position.set(side * 0.18, -0.18, 0.12);
+      upperArm.position.set(side * 0.18, -0.18, 0.10);
       shoulder.add(upperArm);
 
       var elbow = new THREE.Group();
-      elbow.position.set(side * 0.34, -0.42, 0.3);
+      elbow.position.set(side * 0.35, -0.44, 0.28);
       shoulder.add(elbow);
 
-      var forearm = makeLimb(0.15, 0.58, suit);
-      forearm.rotation.z = side * -0.15;
-      forearm.rotation.x = -1.15;
-      forearm.position.set(side * 0.05, -0.05, 0.28);
+      var forearm = makeLimb(0.165, 0.58, suit);
+      forearm.rotation.z = side * -0.14;
+      forearm.rotation.x = -1.10;
+      forearm.position.set(side * 0.04, -0.04, 0.26);
       elbow.add(forearm);
 
-      var handGlove = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 14), glove);
-      handGlove.position.set(side * 0.08, -0.1, 0.56);
-      elbow.add(handGlove);
+      // Red wrist ring
+      var wBand = new THREE.Mesh(new THREE.TorusGeometry(0.170, 0.045, 10, 22), red);
+      wBand.position.set(side * 0.04, -0.07, 0.50);
+      elbow.add(wBand);
+
+      // Gloved hand
+      var hand = new THREE.Mesh(new THREE.SphereGeometry(0.180, 14, 12), gloveM);
+      hand.position.set(side * 0.06, -0.10, 0.57);
+      elbow.add(hand);
     });
 
-    // legs — bent, sitting on the moon's surface
+    // ── LEGS — chubby, dangling/bent, sitting on moon ─────────────────────────
     [-1, 1].forEach(function (side) {
       var hip = new THREE.Group();
-      hip.position.set(0.32 * side, -0.18, 0.05);
+      hip.position.set(0.30 * side, -0.15, 0.04);
       astronautGroup.add(hip);
 
-      var thigh = makeLimb(0.23, 0.72, suit);
-      thigh.rotation.x = 1.35;
-      thigh.position.set(0, -0.08, 0.42);
+      var thigh = makeLimb(0.245, 0.76, suit);
+      thigh.rotation.x = 1.28;
+      thigh.position.set(0, -0.08, 0.40);
       hip.add(thigh);
 
       var knee = new THREE.Group();
-      knee.position.set(0, -0.1, 0.78);
+      knee.position.set(0, -0.10, 0.76);
       hip.add(knee);
 
-      var shin = makeLimb(0.2, 0.66, suit);
-      shin.rotation.x = -0.95;
-      shin.position.set(0, -0.34, 0.12);
+      var shin = makeLimb(0.215, 0.66, suit);
+      shin.rotation.x = -0.88;
+      shin.position.set(0, -0.32, 0.10);
       knee.add(shin);
 
-      var boot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.46), glove);
-      boot.position.set(0, -0.58, 0.5);
-      knee.add(boot);
+      // Boot body (white)
+      var bootBody = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.25, 0.50), bootM);
+      bootBody.position.set(0, -0.55, 0.46);
+      knee.add(bootBody);
+
+      // Teal toe cap — matching the reference's coloured toe detail
+      var bootToe = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.25, 0.14), tealM);
+      bootToe.position.set(0, -0.55, 0.72);
+      knee.add(bootToe);
     });
   }
 
