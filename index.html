@@ -1168,51 +1168,47 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
   loadCandidate(0);
 
-  function animate(ts) {
-    if (!loaded) {
-      raf = requestAnimationFrame(animate);
-      return;
-    }
+  
+function animate(){
+  requestAnimationFrame(animate);
 
-    const delta = Math.min((ts - lastTs) / 1000 || 0, 0.05);
-    lastTs = ts;
+  // smooth cursor follow (inertia)
+  mouse.x += (target.x - mouse.x) * 0.08;
+  mouse.y += (target.y - mouse.y) * 0.08;
 
-    const t = ts * 0.001;
-    const floatX = Math.sin(t * 0.75) * 0.08;
-    const floatY = Math.sin(t * 1.18) * 0.11;
-    const floatZ = Math.sin(t * 0.9) * 0.05;
-    const bob = Math.sin(t * 1.35) * 0.04;
+  const time = Date.now() * 0.001;
 
-    root.position.x = basePos.x + floatX;
-    root.position.y = basePos.y + floatY + bob;
-    root.position.z = basePos.z + floatZ;
+  if(astronaut){
 
-    const lookYaw = targetLookX * 0.22;
-    const lookPitch = targetLookY * 0.16;
-    const lookRoll = -targetLookX * 0.045;
+    // subtle breathing + idle sway
+    const breathe = Math.sin(time * 1.2) * 0.03;
 
-    root.rotation.y = THREE.MathUtils.lerp(root.rotation.y, baseRot.y + lookYaw, 0.08);
-    root.rotation.x = THREE.MathUtils.lerp(root.rotation.x, baseRot.x + lookPitch - hoverBoost * 0.05, 0.08);
-    root.rotation.z = THREE.MathUtils.lerp(root.rotation.z, baseRot.z + lookRoll, 0.08);
+    const tx = mouse.y * 0.25;
+    const ty = mouse.x * 0.45;
 
-    if (model) {
-      model.rotation.y += delta * (0.03 + hoverBoost * 0.01);
-    }
+    astronaut.rotation.x += (tx - astronaut.rotation.x) * 0.08;
+    astronaut.rotation.y += (ty - astronaut.rotation.y) * 0.08;
 
-    renderer.render(scene, camera);
-    raf = requestAnimationFrame(animate);
+    astronaut.rotation.z = breathe;
+
+    // slight vertical float
+    astronaut.position.y += Math.sin(time * 1.5) * 0.0008;
+
   }
 
-  let io = null;
-  if ("IntersectionObserver" in window) {
-    io = new IntersectionObserver((entries) => {
-      visible = !!entries[0]?.isIntersecting;
-      if (visible && loaded && !reduceMotion && !raf) raf = requestAnimationFrame(animate);
-      if (!visible && raf) {
-        cancelAnimationFrame(raf);
-        raf = 0;
-      }
-    }, { threshold: 0.01 });
+  if(headBone){
+
+    // head leads cursor slightly (natural delay)
+    const hx = mouse.y * 0.9;
+    const hy = mouse.x * 0.9;
+
+    headBone.rotation.x += (hx - headBone.rotation.x) * 0.12;
+    headBone.rotation.y += (hy - headBone.rotation.y) * 0.12;
+  }
+
+  renderer.render(scene, camera);
+}
+;
     io.observe(canvas.closest(".hero") || canvas);
   }
 
@@ -1240,12 +1236,15 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 <script>
 let scene, camera, renderer, astronaut, headBone;
-const mouse = {x:0,y:0};
 
-window.addEventListener('pointermove', (e)=>{
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+const mouse = { x: 0, y: 0 };
+const target = { x: 0, y: 0 };
+
+window.addEventListener('pointermove', (e) => {
+  target.x = (e.clientX / window.innerWidth) * 2 - 1;
+  target.y = (e.clientY / window.innerHeight) * 2 - 1;
 });
+
 
 function init3D(){
   const canvas = document.getElementById('hero3d');
