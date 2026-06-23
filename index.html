@@ -1190,6 +1190,15 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
     lower.scale.set(1.22, 0.80, 1.08);
     neck.add(lower);
 
+    // Tiny seam plug for the last exposed triangular gap on the collar edge.
+    const seamPlug = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 16, 12),
+      cavityMaterial
+    );
+    seamPlug.position.set(0.14, 0.11, 0.0);
+    seamPlug.scale.set(1.8, 0.9, 1.3);
+    neck.add(seamPlug);
+
     return neck;
   }
 
