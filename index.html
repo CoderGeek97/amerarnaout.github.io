@@ -1075,6 +1075,8 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
   let currentLookX = 0, currentLookY = 0;
   let targetLookX  = 0, targetLookY  = 0;
   let headPivot = null;   // Group that rotates to track the cursor — head only
+  let bodyMaterial = null;
+  let neckFill = null;
 
   // ── resize ────────────────────────────────────────────────────────────────
   function resize() {
@@ -1126,21 +1128,6 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
   root.scale.setScalar(SHARED_SCALE);
 
-  // ── Neck fill — hides the seam gap between head and body ──────────────────
-  // A short cylinder sitting at the neck joint, matching the dark inner collar.
-  // It's static (parented to root, not headPivot) so it always bridges the gap
-  // regardless of how far the head rotates. Radius and height chosen to fully
-  // overlap the cut edges on both the head and body sides.
-  {
-    const neckFillGeo = new THREE.CylinderGeometry(0.118, 0.118, 0.16, 40, 1);
-    const neckFillMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1410, roughness: 0.55, metalness: 0.18
-    });
-    const neckFill = new THREE.Mesh(neckFillGeo, neckFillMat);
-    neckFill.position.set(0.018, NECK_Y_RAW, 0.04); // centred on the actual neck axis
-    root.add(neckFill);
-  }
-
   let bodyReady = false, headReady = false;
   function onBothReady() {
     if (!bodyReady || !headReady) return;
@@ -1157,12 +1144,62 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
     }
   }
 
+
+  function makeNeckFill(material) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: (material && material.color && material.color.isColor) ? material.color.getHex() : 0xF2EEE7,
+      roughness: 0.96,
+      metalness: 0.0
+    });
+
+    const neck = new THREE.Group();
+
+    // Main sleeve that bridges the empty seam and moves with the head.
+    const sleeve = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.20, 0.30, 24, 1, false),
+      mat
+    );
+    sleeve.position.y = -0.02;
+    sleeve.rotation.z = 0.015;
+    neck.add(sleeve);
+
+    // Slightly darker inner occluder to hide hollow depth if the helmet turns.
+    const inner = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.10, 0.11, 0.22, 24, 1, false),
+      new THREE.MeshStandardMaterial({
+        color: 0x1a1815,
+        roughness: 1.0,
+        metalness: 0.0
+      })
+    );
+    inner.position.y = -0.03;
+    neck.add(inner);
+
+    // Thin collar lip to match the suit geometry.
+    const lip = new THREE.Mesh(
+      new THREE.TorusGeometry(0.175, 0.022, 10, 24),
+      mat
+    );
+    lip.rotation.x = Math.PI / 2;
+    lip.position.y = 0.10;
+    neck.add(lip);
+
+    return neck;
+  }
+
   // Body: static, no cursor rotation
   loader.load(
     "./astronaut_body.glb",
     (gltf) => {
       const model = gltf.scene || gltf.scenes?.[0];
       if (!model) return;
+
+      model.traverse((obj) => {
+        if (obj.isMesh && !bodyMaterial) {
+          bodyMaterial = obj.material || null;
+        }
+      });
+
       root.add(model);
       bodyReady = true;
       onBothReady();
@@ -1177,9 +1214,16 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
     (gltf) => {
       const model = gltf.scene || gltf.scenes?.[0];
       if (!model) return;
+
       headPivot = new THREE.Group();
       headPivot.position.set(0, NECK_Y_RAW, 0);
       model.position.set(0, -NECK_Y_RAW, 0);
+
+      // Collar / seam filler: keeps the neck gap hidden when the head turns.
+      neckFill = makeNeckFill(bodyMaterial);
+      neckFill.position.set(0, 0.01, 0);
+      headPivot.add(neckFill);
+
       headPivot.add(model);
       root.add(headPivot);
       headReady = true;
