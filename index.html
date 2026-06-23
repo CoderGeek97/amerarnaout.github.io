@@ -1154,39 +1154,53 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
     const neck = new THREE.Group();
 
-    // Interior volume built from soft rounded shapes so the gap reads as solid,
-    // without a hard rectangular block in front of the visor.
-    const backCap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.17, 24, 16),
+    // Build a soft, rounded internal volume so the whole hollow cavity
+    // reads as filled from every visible angle.
+    const core = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.18, 0.42, 6, 24),
       cavityMaterial
     );
-    backCap.position.set(0, 0.07, -0.03);
-    backCap.scale.set(1.08, 0.82, 1.12);
-    neck.add(backCap);
+    core.position.set(0, 0.10, -0.02);
+    core.rotation.z = 0.02;
+    neck.add(core);
 
-    const midCap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.15, 24, 16),
+    const upperDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 28, 18),
       cavityMaterial
     );
-    midCap.position.set(0, 0.18, -0.02);
-    midCap.scale.set(1.12, 0.86, 1.08);
-    neck.add(midCap);
+    upperDome.position.set(0, 0.28, -0.01);
+    upperDome.scale.set(1.55, 1.05, 1.25);
+    neck.add(upperDome);
 
-    const topCap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.13, 24, 16),
+    const midDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 28, 18),
       cavityMaterial
     );
-    topCap.position.set(0, 0.28, -0.01);
-    topCap.scale.set(1.08, 0.78, 1.05);
-    neck.add(topCap);
+    midDome.position.set(0, 0.14, -0.02);
+    midDome.scale.set(1.65, 1.15, 1.30);
+    neck.add(midDome);
 
-    const lowerPlug = new THREE.Mesh(
-      new THREE.SphereGeometry(0.11, 24, 16),
+    const lowerDome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 28, 18),
       cavityMaterial
     );
-    lowerPlug.position.set(0, -0.05, -0.02);
-    lowerPlug.scale.set(1.18, 0.72, 1.10);
-    neck.add(lowerPlug);
+    lowerDome.position.set(0, -0.05, -0.03);
+    lowerDome.scale.set(1.60, 0.95, 1.18);
+    neck.add(lowerDome);
+
+    // Side plugs widen the fill so you do not see empty space at the edges
+    // when the head rotates left or right.
+    const sideL = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 24, 16),
+      cavityMaterial
+    );
+    sideL.position.set(-0.06, 0.14, -0.02);
+    sideL.scale.set(1.25, 0.95, 1.10);
+    neck.add(sideL);
+
+    const sideR = sideL.clone();
+    sideR.position.x = 0.06;
+    neck.add(sideR);
 
     return neck;
   }
