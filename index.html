@@ -1291,6 +1291,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
   let targetLookX  = 0, targetLookY  = 0;
   let headPivot = null;   // Group that rotates to track the cursor — head only
   let touchActive = false; // true while a finger is on the screen (mobile only)
+  let touchTimer  = null;  // delayed return-to-idle after a quick tap
 
   // ── resize ────────────────────────────────────────────────────────────────
   function resize() {
@@ -1318,7 +1319,16 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
     // Touch active  → head looks toward the finger's position on screen.
     // No touch      → idle wander driven by sin waves in the animate loop.
     // passive:true means we never block scrolling.
+    //
+    // SINGLE-TAP FIX: touchend fires in ~50 ms on a quick tap — far too fast
+    // for the 0.07 lerp to reach the target.  We delay the return-to-idle by
+    // TOUCH_HOLD_MS so the head has time to fully animate to the tapped spot.
+    // A rapid second tap clears the timer immediately so it feels responsive.
+    const TOUCH_HOLD_MS = 900;
+
     const onTouchStart = (e) => {
+      // Cancel any pending return-to-idle so rapid taps redirect instantly
+      if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
       touchActive = true;
       const t = e.touches[0];
       if (t) setFromPointer(t.clientX, t.clientY);
@@ -1327,7 +1337,14 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
       const t = e.touches[0];
       if (t) setFromPointer(t.clientX, t.clientY);
     };
-    const onTouchEnd = () => { touchActive = false; };
+    const onTouchEnd = () => {
+      // Keep looking at the tapped spot long enough for the lerp to arrive,
+      // then smoothly drift back into the idle wander.
+      touchTimer = setTimeout(() => {
+        touchActive = false;
+        touchTimer  = null;
+      }, TOUCH_HOLD_MS);
+    };
 
     window.addEventListener("touchstart",  onTouchStart, { passive: true });
     window.addEventListener("touchmove",   onTouchMove,  { passive: true });
