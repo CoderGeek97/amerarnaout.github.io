@@ -1554,8 +1554,23 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
   const _wPoint   = new THREE.Vector3();
   const _ringPlane = new THREE.Plane();
 
+  // Tracks whether the push is ramping up, floating back, or idle.
+  // Used to absorb double-clicks that would otherwise reverse the smooth
+  // expo.out deceleration mid-flight and create a harsh direction-change.
+  let _pushPhase = 'idle'; // 'ramping' | 'returning' | 'idle'
+
   function triggerPush(screenX, screenY) {
     if (!ringMat || !tiltGroup) return;
+
+    // ── Double-click guard ─────────────────────────────────────────────────
+    // A second click while the ring is returning to rest (and still glowing
+    // above 40%) would abruptly reverse the expo.out deceleration — that
+    // direction flip is what reads as "harsh". We simply absorb those clicks:
+    // the first push is still beautiful and the ring is already lit up, so
+    // the user loses nothing. Once the strength drops below 0.40 a new push
+    // can fire again and feels smooth from a low starting value.
+    const cur = ringMat.uniforms.uPushStrength.value;
+    if (_pushPhase === 'returning' && cur > 0.40) return;
 
     // Build a ray through the screen point
     const ndcX = (screenX / window.innerWidth)  *  2 - 1;
@@ -1580,17 +1595,25 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
     ringMat.uniforms.uPushCenter.value.copy(_hitWorld);
 
-    // Gentle slow surge out → soft spring return
+    // ── Proportional ramp duration ─────────────────────────────────────────
+    // If a re-trigger happens mid-ramp (e.g. two clicks in quick succession
+    // during the ramp-up phase), scale the ramp time by the remaining
+    // distance to 1.0 so the animation speed stays consistent — no pop.
+    const rampDuration = Math.max(0.06, (1 - cur) * 0.35);
+
+    _pushPhase = 'ramping';
     gsap.killTweensOf(ringMat.uniforms.uPushStrength);
     gsap.to(ringMat.uniforms.uPushStrength, {
       value: 1.0,
-      duration: 0.35,
+      duration: rampDuration,
       ease: "power2.out",
       onComplete() {
+        _pushPhase = 'returning';
         gsap.to(ringMat.uniforms.uPushStrength, {
           value: 0.0,
           duration: 1.8,
-          ease: "expo.out"
+          ease: "expo.out",
+          onComplete() { _pushPhase = 'idle'; }
         });
       }
     });
